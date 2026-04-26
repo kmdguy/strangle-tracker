@@ -173,7 +173,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v1.7</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v1.8</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -681,12 +681,28 @@ Include ALL relevant events for each instrument within its DTE window. For instr
     }
 
     const data=await response.json();
-    const textBlocks=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    console.log('API response:', JSON.stringify(data));
+
+    // Handle API errors returned as JSON
+    if(data.error){
+      throw new Error(data.error.message||'API returned an error');
+    }
+
+    // Extract text from response content blocks defensively
+    const content=data.content||[];
+    const textBlocks=content.filter(b=>b&&b.type==='text').map(b=>b.text||'').join('');
     const clean=textBlocks.replace(/```json|```/g,'').trim();
+    console.log('Extracted text:', clean.substring(0,500));
 
     let found=[];
-    const match=clean.match(/\[[\s\S]*\]/);
-    if(match) found=JSON.parse(match[0]);
+    try{
+      const match=clean.match(/\[[\s\S]*\]/);
+      if(match) found=JSON.parse(match[0]);
+    }catch(parseErr){
+      console.error('JSON parse error:', parseErr);
+      status.innerHTML=`<span style="color:var(--danger-text)">Scan completed but could not parse results. Check console for details.</span>`;
+      return;
+    }
 
     if(!found.length){
       status.innerHTML='<span style="color:var(--warning-text)">No events found — try adding expiry dates to more instruments.</span>';
