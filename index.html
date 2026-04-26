@@ -609,21 +609,44 @@ function renderTable(){
 async function scanEvents(){
   const btn=document.getElementById('scan-btn');
   const status=document.getElementById('scan-status');
-  const activeInstruments=instruments.filter(r=>r.exp&&calcDTE(r.exp)!==null);
-  if(!activeInstruments.length){
-    status.textContent='No instruments have expiry dates set. Add expiry dates first.';
+
+  // Build combined list: candidate rows with expiry dates + open positions
+  const candidateRows=instruments.filter(r=>r.exp&&calcDTE(r.exp)!==null);
+
+  // For open positions, use their row expiry if set, otherwise default 60 days forward
+  const sixtyDaysOut=new Date(TODAY);
+  sixtyDaysOut.setDate(sixtyDaysOut.getDate()+60);
+  const sixtyDaysStr=MONTHS[sixtyDaysOut.getMonth()]+' '+sixtyDaysOut.getDate()+' '+sixtyDaysOut.getFullYear();
+
+  const openRows=openPositions.map(sym=>{
+    const row=instruments.find(r=>r.sym.toUpperCase()===sym.toUpperCase());
+    const name=row?row.name:sym;
+    const exp=row&&row.exp&&calcDTE(row.exp)!==null?row.exp:sixtyDaysStr;
+    return{sym,name,exp};
+  });
+
+  // Merge — open positions first, then candidates not already in open list
+  const allRows=[
+    ...openRows,
+    ...candidateRows.filter(r=>!openPositions.includes(r.sym.toUpperCase()))
+  ];
+
+  if(!allRows.length){
+    status.textContent='No instruments or open positions to scan for.';
     return;
   }
+
   btn.disabled=true;
   btn.innerHTML='Scanning...';
-  status.textContent='Researching upcoming events for your instruments...';
+  status.textContent='Researching upcoming events for your instruments and open positions...';
 
   const today=TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-  const instrList=activeInstruments.map(r=>{
+  const instrList=allRows.map(r=>{
     const dte=calcDTE(r.exp);
     const expDate=parseExp(r.exp);
     const expStr=expDate?expDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'unknown';
-    return `${r.sym} (${r.name}) — expires ${expStr}, ${dte} DTE`;
+    const tag=openPositions.includes(r.sym.toUpperCase())?'[OPEN POSITION]':'[CANDIDATE]';
+    return `${r.sym} (${r.name}) ${tag} — expires ${expStr}${dte!==null?', '+dte+' DTE':''}`;
   }).join('\n');
 
   const prompt=`Today is ${today}. I am a futures options trader running short strangles. I need you to identify ALL relevant upcoming scheduled binary events between today and each instrument's expiration date listed below. Use web search to find current, accurate dates.
@@ -678,7 +701,7 @@ Include ALL relevant events for each instrument within its DTE window. For instr
           added++;
         }
       });
-      status.innerHTML=`<span style="color:var(--success-text)">&#10003; Found ${found.length} events (${added} new) across ${activeInstruments.length} instruments.</span>`;
+      status.innerHTML=`<span style="color:var(--success-text)">&#10003; Found ${found.length} events (${added} new) across ${allRows.length} instruments (including ${openRows.length} open positions).</span>`;
       renderEvents();
       renderTable();
     }
