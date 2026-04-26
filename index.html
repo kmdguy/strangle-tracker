@@ -173,7 +173,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker</h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v1.7</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -664,7 +664,7 @@ Return ONLY a JSON array, no other text, no markdown, no backticks. Each object 
 Include ALL relevant events for each instrument within its DTE window. For instruments like CL include EIA weekly reports. For NG include EIA natural gas storage reports every Thursday. For ZC/ZW/ZS include USDA reports. For RTY/MNQ/MES include FOMC and major macro releases. For 6E include ECB meetings and FOMC. Only include events that fall between today and the instrument's expiration date.`;
 
   try{
-    const response=await fetch('https://api.anthropic.com/v1/messages',{
+    const response=await fetch('https://strangle-proxy.underhill-dan.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
