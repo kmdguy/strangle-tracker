@@ -178,7 +178,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.3</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.4</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -689,19 +689,6 @@ Find per instrument type:
 CL/NG: EIA weekly storage (every Thu). ZC/ZW/ZS: USDA WASDE, crop reports. LE/HE: USDA cattle/hog reports. RTY/MES/MNQ: FOMC, CPI, NFP, GDP. 6E/6B/6A: ECB, FOMC, CPI. All: any major scheduled event within DTE window.
 
 Return ONLY a JSON array. Each object: {"sym":"","desc":"","date":"Mon DD YYYY"}. No markdown, no backticks, no other text.`;
-
-  try{
-    const response=await fetch('https://strangle-proxy.underhill-dan.workers.dev',{
-      method:'POST',
-
-
-
-
-
-
-
-
-
 
   try{
     const response=await fetch('https://strangle-proxy.underhill-dan.workers.dev',{
