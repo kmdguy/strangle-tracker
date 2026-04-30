@@ -72,6 +72,11 @@
   tbody tr.row-filtered td.stage-cell{color:var(--text) !important}
   tbody tr.row-filtered td.stage-cell *{opacity:1 !important}
   tbody tr.row-filtered.show{display:table-row}
+  tbody tr.row-highlighted{background:rgba(234,179,8,0.12) !important;box-shadow:inset 3px 0 0 #d97706}
+  tbody tr.row-highlighted:focus-within{background:rgba(234,179,8,0.18) !important}
+  .star-btn{background:none;border:none;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;opacity:0.25;transition:opacity 0.15s,transform 0.15s;color:var(--text)}
+  .star-btn:hover{opacity:0.6;transform:scale(1.2)}
+  .star-btn.starred{opacity:1;color:#d97706}
   .tip-wrap{position:relative;display:inline-block}
   .tip-wrap .tip{
     visibility:hidden;opacity:0;
@@ -173,7 +178,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.0</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.1</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -203,6 +208,7 @@
     <div class="table-wrap">
       <table>
         <thead><tr>
+          <th style="width:30px" class="ns"></th>
           <th class="c-sym"  onclick="sortBy('sym')">Symbol <span class="si" id="si-sym"></span></th>
           <th class="c-exp  ns">Expiry</th>
           <th class="c-dte"  onclick="sortBy('dte')" title="Auto-calculated from expiry">DTE <span class="si" id="si-dte"></span></th>
@@ -422,9 +428,9 @@ function isFull(r){
 }
 function rowClass(r){
   const st=s1(r);
-  if(st==='open') return 'row-open';
-  if(st.startsWith('fail')&&isFull(r)) return 'row-filtered';
-  return '';
+  if(st==='open') return 'row-open'+(r.highlighted?' row-highlighted':'');
+  if(st.startsWith('fail')&&isFull(r)) return 'row-filtered'+(r.highlighted?' row-highlighted':'');
+  return r.highlighted?'row-highlighted':'';
 }
 function bc(s){return s>=70?'#3b6d11':s>=45?'#ba7517':'#a32d2d';}
 function badge(v){
@@ -471,6 +477,13 @@ function refreshRow(idx){
   if(row) row.className=rowClass(r);
 }
 
+function toggleHighlight(idx){
+  instruments[idx].highlighted=!instruments[idx].highlighted;
+  const row=document.getElementById('row'+idx);
+  const btn=document.getElementById('star'+idx);
+  if(row) row.classList.toggle('row-highlighted', instruments[idx].highlighted);
+  if(btn) btn.classList.toggle('starred', instruments[idx].highlighted);
+}
 function toggleNoIVR(idx,val){
   instruments[idx].noivr=val;
   instruments[idx].ivr='';
@@ -544,7 +557,7 @@ function addInstrument(){
   const sym=document.getElementById('new-sym').value.trim().toUpperCase();
   const name=document.getElementById('new-name').value.trim();
   if(!sym)return;
-  instruments.push({sym,name,exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false});
+  instruments.push({sym,name,exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false});
   document.getElementById('new-sym').value='';document.getElementById('new-name').value='';
   renderAll();
 }
@@ -569,6 +582,7 @@ function renderTable(){
     const col=bc(score),rowCls=rowClass(r);
     const p=expParts(r.exp);
     return`<tr id="row${i}" class="${rowCls}">
+      <td style="text-align:center"><button id="star${i}" class="star-btn${r.highlighted?' starred':''}" onclick="toggleHighlight(${i})" title="Highlight row">★</button></td>
       <td><input type="text" value="${r.sym}" onchange="updateField(${i},'sym',this.value)" style="font-weight:600;text-align:left"></td>
       <td><div class="dds">
         <select class="dd-m" id="ddm${i}" onchange="onDDChange(${i})">${moOpts(p.m)}</select>
@@ -649,19 +663,28 @@ async function scanEvents(){
     return `${r.sym} (${r.name}) ${tag} — expires ${expStr}${dte!==null?', '+dte+' DTE':''}`;
   }).join('\n');
 
-  const prompt=`Today is ${today}. I am a futures options trader running short strangles. I need you to identify ALL relevant upcoming scheduled binary events between today and each instrument's expiration date listed below. Use web search to find current, accurate dates.
+  const prompt=`Today is ${today}. I trade short strangles on futures options. Find all upcoming scheduled binary events between today and each instrument's expiry that could cause significant price moves. Use web search for accurate dates.
 
-For each instrument, find events that could cause significant price moves — including but not limited to: FOMC meetings, Fed rate decisions, ECB meetings, EIA petroleum/natural gas storage reports, USDA crop reports (WASDE, Grain Stocks, Prospective Plantings), USDA cattle/hog reports, CPI/PPI releases, NFP (non-farm payrolls), GDP releases, options expirations, and any other major scheduled events relevant to that specific instrument.
-
-My instruments and their DTE windows:
+Instruments:
 ${instrList}
 
-Return ONLY a JSON array, no other text, no markdown, no backticks. Each object must have exactly these fields:
-- "sym": the instrument symbol (e.g. "CL")  
-- "desc": short event description (e.g. "EIA Petroleum Storage Report")
-- "date": date as "Mon DD YYYY" (e.g. "May 07 2026")
+Find per instrument type:
+CL/NG: EIA weekly storage (every Thu). ZC/ZW/ZS: USDA WASDE, crop reports. LE/HE: USDA cattle/hog reports. RTY/MES/MNQ: FOMC, CPI, NFP, GDP. 6E/6B/6A: ECB, FOMC, CPI. All: any major scheduled event within DTE window.
 
-Include ALL relevant events for each instrument within its DTE window. For instruments like CL include EIA weekly reports. For NG include EIA natural gas storage reports every Thursday. For ZC/ZW/ZS include USDA reports. For RTY/MNQ/MES include FOMC and major macro releases. For 6E include ECB meetings and FOMC. Only include events that fall between today and the instrument's expiration date.`;
+Return ONLY a JSON array. Each object: {"sym":"","desc":"","date":"Mon DD YYYY"}. No markdown, no backticks, no other text.`;
+
+  try{
+    const response=await fetch('https://strangle-proxy.underhill-dan.workers.dev',{
+      method:'POST',
+
+
+
+
+
+
+
+
+
 
   try{
     const response=await fetch('https://strangle-proxy.underhill-dan.workers.dev',{
