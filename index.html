@@ -72,6 +72,10 @@
   tbody tr.row-filtered td.stage-cell{color:var(--text) !important}
   tbody tr.row-filtered td.stage-cell *{opacity:1 !important}
   tbody tr.row-filtered.show{display:table-row}
+  tbody tr.row-top{background:rgba(34,197,94,0.08) !important;box-shadow:inset 3px 0 0 #16a34a}
+  tbody tr.row-top td{font-weight:500}
+  tbody tr.row-top:focus-within{background:rgba(34,197,94,0.14) !important}
+  .top-badge{font-size:9px;padding:1px 5px;border-radius:6px;background:#16a34a;color:#fff;font-weight:700;margin-left:5px;vertical-align:middle;letter-spacing:0.03em}
   tbody tr.row-highlighted{background:rgba(234,179,8,0.12) !important;box-shadow:inset 3px 0 0 #d97706}
   tbody tr.row-highlighted:focus-within{background:rgba(234,179,8,0.18) !important}
   .star-btn{background:none;border:none;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;opacity:0.25;transition:opacity 0.15s,transform 0.15s;color:var(--text)}
@@ -178,7 +182,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.5</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.6</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -438,11 +442,14 @@ function isFull(r){
   const ivrOk=r.noivr||r.ivr!=='';
   return ivrOk&&r.prem!==''&&r.pop!==''&&r.cap!=='';
 }
-function rowClass(r){
+function rowClass(r, isTop){
   const st=s1(r);
-  if(st==='open') return 'row-open'+(r.highlighted?' row-highlighted':'');
-  if(st.startsWith('fail')&&isFull(r)) return 'row-filtered'+(r.highlighted?' row-highlighted':'');
-  return r.highlighted?'row-highlighted':'';
+  let cls='';
+  if(st==='open') cls='row-open';
+  else if(st.startsWith('fail')&&isFull(r)) cls='row-filtered';
+  else if(isTop) cls='row-top';
+  if(r.highlighted) cls+=' row-highlighted';
+  return cls.trim();
 }
 function bc(s){return s>=70?'#3b6d11':s>=45?'#ba7517':'#a32d2d';}
 function badge(v){
@@ -486,7 +493,7 @@ function refreshRow(idx){
   if(sEl)sEl.innerHTML=`<div class="sw"><div class="sb"><div class="sf" style="width:${score}%;background:${col}"></div></div><span class="sn">${score}</span>${flag}</div>`;
   const bEl=el('s1e'+idx);if(bEl)bEl.innerHTML=badge(st);
   const row=el('row'+idx);
-  if(row) row.className=rowClass(r);
+  if(row) renderTable();
 }
 
 function toggleHighlight(idx){
@@ -582,14 +589,18 @@ function renderTable(){
     if(typeof av==='string')return sortDir*av.localeCompare(bv);
     return sortDir*(bv-av);
   });
+  // Find the top passing candidate by score
+  const topCandidate=sorted.find(({r})=>s1(r)==='pass');
+  const topIdx=topCandidate?topCandidate.i:-1;
   document.getElementById('table-body').innerHTML=sorted.map(({r,i})=>{
     const dte=calcDTE(r.exp),roc=calcROC(r),tgt=calcTarget(r),score=calcScore(r),st=s1(r),dc=dteClass(dte);
     const ef=evsFor(r.sym),flag=ef.length?`<span class="ev-flag" title="${ef.map(e=>e.desc+' ('+e.date+')').join(', ')}">&#9872;</span>`:'';
-    const col=bc(score),rowCls=rowClass(r);
+    const col=bc(score),rowCls=rowClass(r,i===topIdx);
+    const isTop=i===topIdx;
     const p=expParts(r.exp);
     return`<tr id="row${i}" class="${rowCls}">
       <td style="text-align:center"><button id="star${i}" class="star-btn${r.highlighted?' starred':''}" onclick="toggleHighlight(${i})" title="Highlight row">★</button></td>
-      <td><input type="text" value="${r.sym}" onchange="updateField(${i},'sym',this.value)" style="font-weight:600;text-align:left"></td>
+      <td style="white-space:nowrap"><input type="text" value="${r.sym}" onchange="updateField(${i},'sym',this.value)" style="font-weight:600;text-align:left;width:60px">${isTop?'<span class="top-badge">TOP</span>':''}</td>
       <td><div class="dds">
         <select class="dd-m" id="ddm${i}" onchange="onDDChange(${i})">${moOpts(p.m)}</select>
         <select class="dd-d" id="ddd${i}" onchange="onDDChange(${i})">${dyOpts(p.dy)}</select>
