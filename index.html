@@ -178,7 +178,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.4</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.5</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -234,12 +234,7 @@
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:0.75rem">
       <div class="section-label" style="margin-bottom:0">Binary events within DTE window</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn" onclick="clearAutoEvents()" title="Remove all auto-scanned events">Clear auto</button>
-        <button class="btn btn-primary" id="scan-btn" onclick="scanEvents()">&#9889; Scan for events</button>
-      </div>
     </div>
-    <div id="scan-status" style="font-size:12px;color:var(--text2);margin-bottom:8px;min-height:18px"></div>
     <div id="events-list"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
       <input type="text" id="ev-sym"  placeholder="Symbol"            style="width:80px">
@@ -540,7 +535,7 @@ function removeOpenPos(i){openPositions.splice(i,1);renderOpenTags();renderTable
 
 function renderEvents(){
   const el=document.getElementById('events-list');
-  if(!events.length){el.innerHTML='<p style="font-size:12px;color:var(--text2)">No events yet — click "Scan for events" or add manually below.</p>';return;}
+  if(!events.length){el.innerHTML='<p style="font-size:12px;color:var(--text2)">No events added yet. Add manually below.</p>';return;}
   const sorted=[...events].map((e,i)=>({e,i})).sort((a,b)=>{
     const da=new Date(a.e.date), db=new Date(b.e.date);
     return da-db;
@@ -549,7 +544,6 @@ function renderEvents(){
     <div class="ev-item">
       <span class="ev-sym">${e.sym.toUpperCase()}</span>
       <span style="font-size:13px;flex:1">${e.desc}</span>
-      ${e.auto?'<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--info-bg);color:var(--info-text);font-weight:600">auto</span>':''}
       <span style="font-size:12px;color:var(--text2);min-width:90px">${e.date}</span>
       <button class="btn btn-danger btn-sm" onclick="removeEvent(${i})">Remove</button>
     </div>`).join('');
@@ -561,11 +555,6 @@ function addEvent(){
   if(!sym||!desc)return;
   events.push({sym,desc,date});
   ['ev-sym','ev-desc','ev-date'].forEach(id=>document.getElementById(id).value='');
-  renderEvents();renderTable();
-}
-function clearAutoEvents(){
-  events=events.filter(e=>!e.auto);
-  document.getElementById('scan-status').textContent='';
   renderEvents();renderTable();
 }
 function removeEvent(i){events.splice(i,1);renderEvents();renderTable();}
@@ -637,248 +626,6 @@ function renderTable(){
   }).join('');
 }
 
-async function scanEvents(){
-  const btn=document.getElementById('scan-btn');
-  const status=document.getElementById('scan-status');
-
-  // Build combined list: candidate rows with expiry dates + open positions
-  const candidateRows=instruments.filter(r=>r.exp&&calcDTE(r.exp)!==null);
-
-  // For open positions, use their row expiry if set, otherwise default 60 days forward
-  const sixtyDaysOut=new Date(TODAY);
-  sixtyDaysOut.setDate(sixtyDaysOut.getDate()+60);
-  const sixtyDaysStr=MONTHS[sixtyDaysOut.getMonth()]+' '+sixtyDaysOut.getDate()+' '+sixtyDaysOut.getFullYear();
-
-  const openRows=openPositions.map(sym=>{
-    const row=instruments.find(r=>r.sym.toUpperCase()===sym.toUpperCase());
-    const name=row?row.name:sym;
-    const exp=row&&row.exp&&calcDTE(row.exp)!==null?row.exp:sixtyDaysStr;
-    return{sym,name,exp};
-  });
-
-  // Merge — open positions first, then candidates not already in open list
-  const allRows=[
-    ...openRows,
-    ...candidateRows.filter(r=>!openPositions.includes(r.sym.toUpperCase()))
-  ];
-
-  if(!allRows.length){
-    status.textContent='No instruments or open positions to scan for.';
-    return;
-  }
-
-  btn.disabled=true;
-  btn.innerHTML='Scanning...';
-  status.textContent='Researching upcoming events for your instruments and open positions...';
-
-  const today=TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-  const instrList=allRows.map(r=>{
-    const dte=calcDTE(r.exp);
-    const expDate=parseExp(r.exp);
-    const expStr=expDate?expDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'unknown';
-    const tag=openPositions.includes(r.sym.toUpperCase())?'[OPEN POSITION]':'[CANDIDATE]';
-    return `${r.sym} (${r.name}) ${tag} — expires ${expStr}${dte!==null?', '+dte+' DTE':''}`;
-  }).join('\n');
-
-  const prompt=`Today is ${today}. I trade short strangles on futures options. Find all upcoming scheduled binary events between today and each instrument's expiry that could cause significant price moves. Use web search for accurate dates.
-
-Instruments:
-${instrList}
-
-Find per instrument type:
-CL/NG: EIA weekly storage (every Thu). ZC/ZW/ZS: USDA WASDE, crop reports. LE/HE: USDA cattle/hog reports. RTY/MES/MNQ: FOMC, CPI, NFP, GDP. 6E/6B/6A: ECB, FOMC, CPI. All: any major scheduled event within DTE window.
-
-Return ONLY a JSON array. Each object: {"sym":"","desc":"","date":"Mon DD YYYY"}. No markdown, no backticks, no other text.`;
-
-  try{
-    const response=await fetch('https://strangle-proxy.underhill-dan.workers.dev',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-5',
-        max_tokens:1000,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-
-    if(!response.ok){
-      const err=await response.text();
-      throw new Error('API error: '+response.status);
-    }
-
-    const data=await response.json();
-    console.log('API response:', JSON.stringify(data));
-
-    // Handle API errors returned as JSON
-    if(data.error){
-      throw new Error(data.error.message||'API returned an error');
-    }
-
-    // Extract all text blocks — web search responses interleave tool_use and text blocks
-    const content=data.content||[];
-    console.log('Content blocks:', content.map(b=>b.type).join(', '));
-    const textBlocks=content
-      .filter(b=>b&&b.type==='text')
-      .map(b=>b.text||'')
-      .join('');
-    const clean=textBlocks.replace(/```json|```/g,'').trim();
-    console.log('Extracted text (first 500):', clean.substring(0,500));
-
-    let found=[];
-    try{
-      const match=clean.match(/\[[\s\S]*\]/);
-      if(match) found=JSON.parse(match[0]);
-    }catch(parseErr){
-      console.error('JSON parse error:', parseErr);
-      status.innerHTML=`<span style="color:var(--danger-text)">Scan completed but could not parse results. Check console for details.</span>`;
-      return;
-    }
-
-    if(!found.length){
-      console.log('Full clean response:', clean);
-      status.innerHTML='<span style="color:var(--warning-text)">No events returned — the AI may need a moment. Try scanning again.</span>';
-    } else {
-      const existing=events.map(e=>e.sym+'|'+e.desc+'|'+e.date);
-      let added=0;
-      found.forEach(ev=>{
-        const key=ev.sym+'|'+ev.desc+'|'+ev.date;
-        if(!existing.includes(key)){
-          events.push({sym:ev.sym,desc:ev.desc,date:ev.date,auto:true});
-          existing.push(key);
-          added++;
-        }
-      });
-      status.innerHTML=`<span style="color:var(--success-text)">&#10003; Found ${found.length} events (${added} new) across ${allRows.length} instruments (including ${openRows.length} open positions).</span>`;
-      renderEvents();
-      renderTable();
-    }
-  }catch(e){
-    console.error(e);
-    status.innerHTML='<span style="color:var(--danger-text)">Scan failed: '+e.message+'. Check console for details.</span>';
-  }finally{
-    btn.disabled=false;
-    btn.innerHTML='&#9889; Scan for events';
-  }
-}
-
-function copyForClaude(){
-  const today=TODAY.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-  let out=[];
-
-  out.push('STRANGLE CANDIDATE TRACKER — '+today);
-  out.push('');
-
-  // Open positions
-  out.push('── OPEN POSITIONS ──────────────────────────');
-  if(openPositions.length){
-    out.push(openPositions.join(', '));
-  } else {
-    out.push('None');
-  }
-  out.push('');
-
-  // Candidates — filled rows only, sorted by score desc
-  const filled=instruments
-    .filter(r=>r.prem||r.ivr||r.exp)
-    .filter(r=>!openPositions.includes(r.sym.toUpperCase()))
-    .sort((a,b)=>calcScore(b)-calcScore(a));
-
-  const open=instruments.filter(r=>openPositions.includes(r.sym.toUpperCase())&&(r.prem||r.exp));
-
-  if(filled.length){
-    out.push('── CANDIDATES (sorted by score) ────────────');
-    const hdr=padR('SYM',5)+padR('EXPIRY',12)+padR('DTE',5)+padR('IVR',6)+padR('PUT',8)+padR('CALL',8)+padR('CREDIT',8)+padR('CAP REQ',9)+padR('POP%',6)+padR('ROC%',6)+padR('TARGET',8)+padR('STAGE1',8)+padR('SCORE',6)+padR('TREND',10)+'NOTES';
-    out.push(hdr);
-    out.push('─'.repeat(hdr.length));
-    filled.forEach(r=>{
-      const dte=calcDTE(r.exp)??'—';
-      const roc=calcROC(r);
-      const tgt=calcTarget(r);
-      const score=calcScore(r);
-      const stage=s1(r);
-      const stageLabel=stage==='pass'?'PASS':stage.startsWith('fail')?'FAIL ('+stage.split(':')[1]+')':'—';
-      const ivrLabel=r.noivr?'N/A':(r.ivr||'—');
-      const trendLabel=r.trend==='up'?'↑ Up':r.trend==='down'?'↓ Down':r.trend==='choppy'?'~ Choppy':'→ Neutral';
-      out.push(
-        padR(r.sym,5)+
-        padR(r.exp||'—',12)+
-        padR(String(dte),5)+
-        padR(String(ivrLabel),6)+
-        padR(r.put||'—',8)+
-        padR(r.call||'—',8)+
-        padR(r.prem||'—',8)+
-        padR(r.cap||'—',9)+
-        padR(r.pop?r.pop+'%':'—',6)+
-        padR(roc?roc.toFixed(1)+'%':'—',6)+
-        padR(tgt?'$'+tgt:'—',8)+
-        padR(stageLabel,8)+
-        padR(String(score),6)+
-        padR(trendLabel,10)+
-        (r.notes||'')
-      );
-    });
-    out.push('');
-  }
-
-  // Open positions with data
-  if(open.length){
-    out.push('── OPEN POSITIONS WITH DATA ─────────────────');
-    const hdr=padR('SYM',5)+padR('EXPIRY',12)+padR('DTE',5)+padR('PUT',8)+padR('CALL',8)+padR('CREDIT',8)+padR('CAP REQ',9)+padR('POP%',6)+'NOTES';
-    out.push(hdr);
-    out.push('─'.repeat(hdr.length));
-    open.forEach(r=>{
-      const dte=calcDTE(r.exp)??'—';
-      out.push(
-        padR(r.sym,5)+
-        padR(r.exp||'—',12)+
-        padR(String(dte),5)+
-        padR(r.put||'—',8)+
-        padR(r.call||'—',8)+
-        padR(r.prem||'—',8)+
-        padR(r.cap||'—',9)+
-        padR(r.pop?r.pop+'%':'—',6)+
-        (r.notes||'')
-      );
-    });
-    out.push('');
-  }
-
-  // Events
-  if(events.length){
-    out.push('── BINARY EVENTS ───────────────────────────');
-    const sorted=[...events].sort((a,b)=>new Date(a.date)-new Date(b.date));
-    sorted.forEach(e=>{
-      out.push(padR(e.sym.toUpperCase(),6)+padR(e.date,14)+e.desc);
-    });
-    out.push('');
-  }
-
-  out.push('── END ─────────────────────────────────────');
-
-  const text=out.join('\n');
-  navigator.clipboard.writeText(text).then(()=>{
-    const btn=document.getElementById('copy-btn');
-    const orig=btn.innerHTML;
-    btn.innerHTML='&#10003; Copied!';
-    btn.style.color='var(--success-text)';
-    setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';},2000);
-  }).catch(()=>{
-    // Fallback for browsers that block clipboard
-    const ta=document.createElement('textarea');
-    ta.value=text;
-    ta.style.position='fixed';ta.style.opacity='0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    const btn=document.getElementById('copy-btn');
-    const orig=btn.innerHTML;
-    btn.innerHTML='&#10003; Copied!';
-    btn.style.color='var(--success-text)';
-    setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';},2000);
-  });
-}
 
 function padR(str,len){
   return String(str).padEnd(len,' ');
