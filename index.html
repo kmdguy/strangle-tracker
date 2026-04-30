@@ -178,7 +178,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.2</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.3</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -272,21 +272,21 @@ const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 const YEARS=[2026,2027,2028];
 
 const DEF=[
-  {sym:'CL', name:'Crude Oil',      exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'RTY',name:'Russell 2000',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'ZC', name:'Corn',           exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'6E', name:'Euro FX',        exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'LE', name:'Live Cattle',    exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:true},
-  {sym:'NG', name:'Nat. Gas',       exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'6B', name:'British Pound',  exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'HE', name:'Lean Hogs',      exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:true},
-  {sym:'MNQ',name:'Micro Nasdaq',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'ZW', name:'Wheat',          exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'ZS', name:'Soybeans',       exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'6A', name:'Aust. Dollar',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'MES',name:'Micro E-Mini',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'ZN', name:'10 Yr Treasury', exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
-  {sym:'ZB', name:'30 Yr Bond',     exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false},
+  {sym:'CL', name:'Crude Oil',      exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'RTY',name:'Russell 2000',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'ZC', name:'Corn',           exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'6E', name:'Euro FX',        exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'LE', name:'Live Cattle',    exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:true,highlighted:false},
+  {sym:'NG', name:'Nat. Gas',       exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'6B', name:'British Pound',  exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'HE', name:'Lean Hogs',      exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:true,highlighted:false},
+  {sym:'MNQ',name:'Micro Nasdaq',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'ZW', name:'Wheat',          exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'ZS', name:'Soybeans',       exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'6A', name:'Aust. Dollar',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'MES',name:'Micro E-Mini',   exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'ZN', name:'10 Yr Treasury', exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
+  {sym:'ZB', name:'30 Yr Bond',     exp:'',ivr:'',put:'',call:'',prem:'',pop:'',cap:'',trend:'neutral',notes:'',noivr:false,highlighted:false},
 ];
 
 let instruments=[], events=[], openPositions=[], sortKey='score', sortDir=-1;
@@ -298,12 +298,24 @@ function load(){
     const raw=localStorage.getItem(SK);
     if(raw){
       const s=JSON.parse(raw);
-      instruments=s.instruments||clone(DEF);
-      // Migrate older saved data — add any missing fields with defaults
-      instruments=instruments.map(r=>({
-        highlighted:false, noivr:false, notes:'', trend:'neutral',
-        ...r
-      }));
+      const loaded=s.instruments||clone(DEF);
+      instruments=loaded.map(function(r){
+        return {
+          sym:r.sym||'',
+          name:r.name||'',
+          exp:r.exp||'',
+          ivr:r.ivr||'',
+          put:r.put||'',
+          call:r.call||'',
+          prem:r.prem||'',
+          pop:r.pop||'',
+          cap:r.cap||'',
+          trend:r.trend||'neutral',
+          notes:r.notes||'',
+          noivr:r.noivr||false,
+          highlighted:r.highlighted||false
+        };
+      });
       events=s.events||[];
       openPositions=s.openPositions||['RTY','LE','6E','NG'];
     } else {
