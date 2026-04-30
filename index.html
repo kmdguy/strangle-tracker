@@ -178,7 +178,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.1</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.2</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -299,6 +299,11 @@ function load(){
     if(raw){
       const s=JSON.parse(raw);
       instruments=s.instruments||clone(DEF);
+      // Migrate older saved data — add any missing fields with defaults
+      instruments=instruments.map(r=>({
+        highlighted:false, noivr:false, notes:'', trend:'neutral',
+        ...r
+      }));
       events=s.events||[];
       openPositions=s.openPositions||['RTY','LE','6E','NG'];
     } else {
