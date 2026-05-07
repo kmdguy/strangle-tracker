@@ -116,7 +116,7 @@
   /* Date dropdowns */
   .dds{display:flex;gap:4px;align-items:center}
   .dds select{background:var(--bg);color:var(--text);border:0.5px solid var(--border);border-radius:4px;height:30px;font-size:12px;cursor:pointer;padding:3px 4px}
-  .dd-m{width:52px}.dd-d{width:46px}.dd-y{width:62px}
+  .dd-m{width:70px}.dd-d{width:58px}.dd-y{width:68px}
 
   /* Badges */
   .badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600}
@@ -182,7 +182,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.6</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.7</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -369,11 +369,26 @@ function onDDChange(idx){
   const dy=document.getElementById('ddd'+idx).value;
   const y=document.getElementById('ddy'+idx).value;
   instruments[idx].exp=partsToExp(m,dy,y);
-  renderSummary();refreshRow(idx);
+  // Update only derived cells — never call renderTable() here as it
+  // destroys dropdown selections before the browser registers the change
+  const dte=calcDTE(instruments[idx].exp);
+  const score=calcScore(instruments[idx]);
+  const st=s1(instruments[idx]);
+  const dc=dteClass(dte);
+  const col=bc(score);
+  const ef=evsFor(instruments[idx].sym);
+  const flag=ef.length?`<span class="ev-flag" title="${ef.map(e=>e.desc+' ('+e.date+')').join(', ')}">&#9872;</span>`:'';
+  const dEl=document.getElementById('dte'+idx);
+  if(dEl)dEl.innerHTML=dte!==null?`<span class="dte-c ${dc}">${dte}</span>`:'<span style="color:var(--text3)">—</span>';
+  const sEl=document.getElementById('scr'+idx);
+  if(sEl)sEl.innerHTML=`<div class="sw"><div class="sb"><div class="sf" style="width:${score}%;background:${col}"></div></div><span class="sn">${score}</span>${flag}</div>`;
+  const bEl=document.getElementById('s1e'+idx);
+  if(bEl)bEl.innerHTML=badge(st);
+  renderSummary();
 }
 
 function moOpts(sel){
-  let h='<option value="">Mo</option>';
+  let h='<option value="">Month</option>';
   MONTHS.forEach((n,i)=>{
     const val=i+1;
     h+=`<option value="${val}"${sel==val?' selected':''}>${n}</option>`;
