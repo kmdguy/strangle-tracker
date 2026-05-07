@@ -182,7 +182,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.7</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.8</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -652,6 +652,75 @@ function renderTable(){
   }).join('');
 }
 
+
+function copyForClaude(){
+  const today=TODAY.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  let out=[];
+  out.push('STRANGLE CANDIDATE TRACKER — '+today);
+  out.push('');
+  out.push('── OPEN POSITIONS ──────────────────────────');
+  out.push(openPositions.length?openPositions.join(', '):'None');
+  out.push('');
+  const filled=instruments
+    .filter(r=>r.prem||r.ivr||r.exp)
+    .filter(r=>!openPositions.includes(r.sym.toUpperCase()))
+    .sort((a,b)=>calcScore(b)-calcScore(a));
+  const open=instruments.filter(r=>openPositions.includes(r.sym.toUpperCase())&&(r.prem||r.exp));
+  if(filled.length){
+    out.push('── CANDIDATES (sorted by score) ────────────');
+    const hdr=padR('SYM',5)+padR('EXPIRY',12)+padR('DTE',5)+padR('IVR',6)+padR('PUT',8)+padR('CALL',8)+padR('CREDIT',8)+padR('CAP REQ',9)+padR('POP%',6)+padR('ROC%',6)+padR('TARGET',8)+padR('STAGE1',14)+padR('SCORE',6)+padR('TREND',10)+'NOTES';
+    out.push(hdr);
+    out.push('─'.repeat(hdr.length));
+    filled.forEach(r=>{
+      const dte=calcDTE(r.exp)??'—';
+      const roc=calcROC(r);
+      const tgt=calcTarget(r);
+      const score=calcScore(r);
+      const stage=s1(r);
+      const stageLabel=stage==='pass'?'PASS':stage.startsWith('fail')?'FAIL('+stage.split(':')[1]+')':'—';
+      const ivrLabel=r.noivr?'N/A':(r.ivr||'—');
+      const trendLabel=r.trend==='up'?'↑ Up':r.trend==='down'?'↓ Down':r.trend==='choppy'?'~ Choppy':'→ Neutral';
+      out.push(padR(r.sym,5)+padR(r.exp||'—',12)+padR(String(dte),5)+padR(String(ivrLabel),6)+padR(r.put||'—',8)+padR(r.call||'—',8)+padR(r.prem||'—',8)+padR(r.cap||'—',9)+padR(r.pop?r.pop+'%':'—',6)+padR(roc?roc.toFixed(1)+'%':'—',6)+padR(tgt?'$'+tgt:'—',8)+padR(stageLabel,14)+padR(String(score),6)+padR(trendLabel,10)+(r.notes||''));
+    });
+    out.push('');
+  }
+  if(open.length){
+    out.push('── OPEN POSITIONS WITH DATA ─────────────────');
+    const hdr=padR('SYM',5)+padR('EXPIRY',12)+padR('DTE',5)+padR('PUT',8)+padR('CALL',8)+padR('CREDIT',8)+padR('CAP REQ',9)+padR('POP%',6)+'NOTES';
+    out.push(hdr);
+    out.push('─'.repeat(hdr.length));
+    open.forEach(r=>{
+      const dte=calcDTE(r.exp)??'—';
+      out.push(padR(r.sym,5)+padR(r.exp||'—',12)+padR(String(dte),5)+padR(r.put||'—',8)+padR(r.call||'—',8)+padR(r.prem||'—',8)+padR(r.cap||'—',9)+padR(r.pop?r.pop+'%':'—',6)+(r.notes||''));
+    });
+    out.push('');
+  }
+  if(events.length){
+    out.push('── BINARY EVENTS ───────────────────────────');
+    const sorted=[...events].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    sorted.forEach(e=>{out.push(padR(e.sym.toUpperCase(),6)+padR(e.date,14)+e.desc);});
+    out.push('');
+  }
+  out.push('── END ─────────────────────────────────────');
+  const text=out.join('\n');
+  const btn=document.getElementById('copy-btn');
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.innerHTML;
+    btn.innerHTML='&#10003; Copied!';
+    btn.style.color='var(--success-text)';
+    setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';},2000);
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const orig=btn.innerHTML;
+    btn.innerHTML='&#10003; Copied!';
+    btn.style.color='var(--success-text)';
+    setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';},2000);
+  });
+}
 
 function padR(str,len){
   return String(str).padEnd(len,' ');
