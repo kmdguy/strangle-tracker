@@ -182,7 +182,7 @@
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.8</span></h1>
+      <h1>Strangle candidate tracker <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:8px">v2.9</span></h1>
       <p id="session-date"></p>
     </div>
     <div class="header-actions">
@@ -507,10 +507,21 @@ function refreshRow(idx){
   const sEl=el('scr'+idx);
   if(sEl)sEl.innerHTML=`<div class="sw"><div class="sb"><div class="sf" style="width:${score}%;background:${col}"></div></div><span class="sn">${score}</span>${flag}</div>`;
   const bEl=el('s1e'+idx);if(bEl)bEl.innerHTML=badge(st);
+  // Update row class without re-rendering the whole table
   const row=el('row'+idx);
-  if(row) renderTable();
+  if(row) row.className=rowClass(r,idx===topCandidateIdx());
 }
 
+function topCandidateIdx(){
+  let bestScore=-1, bestIdx=-1;
+  instruments.forEach((r,i)=>{
+    if(s1(r)==='pass'){
+      const sc=calcScore(r);
+      if(sc>bestScore){bestScore=sc;bestIdx=i;}
+    }
+  });
+  return bestIdx;
+}
 function toggleHighlight(idx){
   instruments[idx].highlighted=!instruments[idx].highlighted;
   const row=document.getElementById('row'+idx);
@@ -522,7 +533,18 @@ function toggleNoIVR(idx,val){
   instruments[idx].noivr=val;
   instruments[idx].ivr='';
   renderSummary();
-  renderTable();
+  refreshRow(idx);
+  // Re-render just this row's IVR cell since the input type changes
+  const ivrCell=document.getElementById('ivrcell'+idx);
+  if(ivrCell){
+    const r=instruments[idx];
+    ivrCell.innerHTML=`<div class="ivr-cell">
+      ${r.noivr?'<span class="ivr-na">N/A</span>':`<input type="text" inputmode="decimal" value="${r.ivr}" placeholder="—" tabindex="${idx*10+1}" onchange="updateField(${idx},'ivr',this.value)">`}
+      <label class="na-toggle ${r.noivr?'active':''}" title="Check if TastyTrade shows -- for IVR">
+        <input type="checkbox" ${r.noivr?'checked':''} onchange="toggleNoIVR(${idx},this.checked)">N/A
+      </label>
+    </div>`;
+  }
 }
 function updateField(idx,field,val){
   instruments[idx][field]=val;
@@ -622,20 +644,20 @@ function renderTable(){
         <select class="dd-y" id="ddy${i}" onchange="onDDChange(${i})">${yrOpts(p.y)}</select>
       </div></td>
       <td class="r" id="dte${i}">${dte!==null?`<span class="dte-c ${dc}">${dte}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-      <td><div class="ivr-cell">
+      <td id="ivrcell${i}"><div class="ivr-cell">
         ${r.noivr
           ? `<span class="ivr-na">N/A</span>`
-          : `<input type="number" value="${r.ivr}" placeholder="—" step="0.1" onchange="updateField(${i},'ivr',this.value)">`
+          : `<input type="text" inputmode="decimal" value="${r.ivr}" placeholder="—" tabindex="${i*10+1}" onchange="updateField(${i},'ivr',this.value)">`
         }
         <label class="na-toggle ${r.noivr?'active':''}" title="Check if TastyTrade shows -- for IVR">
           <input type="checkbox" ${r.noivr?'checked':''} onchange="toggleNoIVR(${i},this.checked)">N/A
         </label>
       </div></td>
-      <td><input type="number" value="${r.put}"  placeholder="—" step="0.01" onchange="updateField(${i},'put', this.value)"></td>
-      <td><input type="number" value="${r.call}" placeholder="—" step="0.01" onchange="updateField(${i},'call',this.value)"></td>
-      <td><input type="number" value="${r.prem}" placeholder="—" step="0.01" onchange="updateField(${i},'prem',this.value)"></td>
-      <td><input type="number" value="${r.cap}"  placeholder="—" step="1" onchange="updateField(${i},'cap', this.value)"></td>
-      <td><input type="number" value="${r.pop}"  placeholder="—" step="1" min="0" max="100" onchange="updateField(${i},'pop', this.value)"></td>
+      <td><input type="text" inputmode="decimal" value="${r.put}"  placeholder="—" tabindex="${i*10+2}" onchange="updateField(${i},'put', this.value)"></td>
+      <td><input type="text" inputmode="decimal" value="${r.call}" placeholder="—" tabindex="${i*10+3}" onchange="updateField(${i},'call',this.value)"></td>
+      <td><input type="text" inputmode="decimal" value="${r.prem}" placeholder="—" tabindex="${i*10+4}" onchange="updateField(${i},'prem',this.value)"></td>
+      <td><input type="text" inputmode="decimal" value="${r.cap}"  placeholder="—" tabindex="${i*10+5}" onchange="updateField(${i},'cap', this.value)"></td>
+      <td><input type="text" inputmode="decimal" value="${r.pop}"  placeholder="—" tabindex="${i*10+6}" onchange="updateField(${i},'pop', this.value)"></td>
       <td class="r" id="roc${i}" style="font-size:12px;color:var(--text)">${roc?roc.toFixed(1)+'%':'—'}</td>
       <td class="r" id="tgt${i}" style="font-size:12px;color:var(--text)">${tgt?'$'+tgt:'—'}</td>
       <td id="s1e${i}" class="stage-cell">${badge(st)}</td>
